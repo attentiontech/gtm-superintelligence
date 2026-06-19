@@ -12,6 +12,13 @@ semantic versioning.
   diarized names, rebases absolute ISO timestamps to call offsets, and accepts the bare array
   or wrapped `{"transcript": [...]}` note object. 10 adapters total.
 
+### Fixed
+- `gtmsi coach` no longer truncates and fails with a JSON parse error on full-length calls.
+  Raised the coaching output budget from 4096 to 16384 tokens, made the JSON-repair retry
+  adaptive (it doubles the budget, capped at 32768, when the first response stops on
+  `max_tokens`), and guarded the final parse so a still-truncated retry raises a typed
+  `LLMError` ("model output exceeded max_tokens…") instead of a raw `json.JSONDecodeError`.
+
 ## [0.1.0] - 2026-05-31
 
 ### Added

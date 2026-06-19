@@ -30,6 +30,12 @@ class LLMError(RuntimeError):
     pass
 
 
+# Ceiling for the truncation retry. Safely under the smallest supported model
+# output cap (Sonnet 4.6 tops out at 64K; Opus 4.8 at 128K), so doubling the
+# coach budget here never sends an over-limit max_tokens that the API rejects.
+_MAX_RETRY_TOKENS = 32768
+
+
 class AnthropicCoach:
     def __init__(self, api_key: str | None = None, model: str = DEFAULT_MODEL, max_tokens: int = 4096):
         try:
@@ -73,27 +79,46 @@ class AnthropicCoach:
             {"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}
         ]
 
-        raw = self._call(system_blocks, content_blocks, max_tokens)
+        raw, stop_reason = self._call(system_blocks, content_blocks, max_tokens)
         try:
             return _extract_json(raw)
-        except ValueError:
-            # One corrective retry: ask for valid JSON only.
-            fix = self._call(
+        except ValueError as first_err:
+            # The most common cause of unparseable JSON is a response truncated at
+            # the token cap. When that's what happened, retrying with the SAME budget
+            # just truncates again — so bump the budget for the retry.
+            truncated = stop_reason == "max_tokens"
+            retry_tokens = max_tokens
+            if truncated:
+                base = max_tokens or self.max_tokens
+                retry_tokens = min(base * 2, _MAX_RETRY_TOKENS)
+
+            fix, fix_stop = self._call(
                 system_blocks,
                 content_blocks
                 + [{"type": "text", "text": "Your previous output was not valid JSON. Reply with ONLY the JSON, no prose."}],
-                max_tokens,
+                retry_tokens,
             )
-            return _extract_json(fix)
+            try:
+                return _extract_json(fix)
+            except ValueError as retry_err:
+                # Guard the final parse: surface a typed, actionable error instead of
+                # letting a raw json.JSONDecodeError escape.
+                if truncated or fix_stop == "max_tokens":
+                    raise LLMError(
+                        "model output exceeded max_tokens and was truncated; raise max_tokens "
+                        "or shorten the transcript"
+                    ) from retry_err
+                raise LLMError(f"model did not return valid JSON: {retry_err}") from first_err
 
-    def _call(self, system_blocks, content_blocks, max_tokens) -> str:
+    def _call(self, system_blocks, content_blocks, max_tokens) -> tuple[str, str | None]:
         resp = self.client.messages.create(
             model=self.model,
             max_tokens=max_tokens or self.max_tokens,
             system=system_blocks,
             messages=[{"role": "user", "content": content_blocks}],
         )
-        return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        text = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+        return text, getattr(resp, "stop_reason", None)
 
 
 def _extract_json(text: str) -> Any:

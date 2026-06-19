@@ -105,7 +105,12 @@ def coach(t: Transcript, classification: Classification, reg: Registry, llm: LLM
             CachedBlock("Outcome library", outcomes_yaml),
         ],
         user_text=user,
-        max_tokens=4096,
+        # A full coaching report (outcomes + 7-9 scored criteria with rationale and
+        # evidence quotes + strengths + improvements + manager notes) routinely runs
+        # past 4096 output tokens on a substantive call, truncating the JSON mid-stream.
+        # 16384 fits a full report across Sonnet 4.6 and Opus 4.8; the retry in
+        # AnthropicCoach.complete_json bumps further if a call still truncates.
+        max_tokens=16384,
     )
 
     # Merge known classification and back-fill criterion weights/bands defensively.

@@ -45,7 +45,7 @@ The `side` field on participants and turns is critical for coaching: only
 
 ## Built-in adapters
 
-There are **9** built-in adapters:
+There are **10** built-in adapters:
 
 | Adapter ID | Input format | Notes |
 |---|---|---|
@@ -56,6 +56,7 @@ There are **9** built-in adapters:
 | `otter` | Otter.ai export (JSON or `.txt`) | Best-effort/unverified (API is Enterprise-gated). Handles `utterances`/`transcripts`/`speeches`, `speaker_id`→top-level `speakers[]`, `start_offset` in milliseconds. Prefer the SRT/TXT export when possible. |
 | `recall` | Recall.ai export (JSON) | JSON array of turns `{participant, words[]}`; joins words into a turn, `start_timestamp.relative` in seconds, maps `is_host`→rep (others→prospect; override with `--participants`). |
 | `grain` | Grain export (JSON) | JSON array `[{start,end,text,speaker,participant_id}]`; `start`/`end` in milliseconds (ms→seconds). |
+| `granola` | Granola public API (`GET /v1/notes/{id}?include=transcript`) | JSON array of segments `{text, start_time, end_time, speaker:{source}}`. Splits by **audio source** nested under `speaker` (`microphone`→rep, `speaker`→prospect) rather than diarized names, so `side` comes from the channel. Absolute ISO `start_time`/`end_time` rebased to call offsets. Accepts a bare array or the wrapped `{"transcript": [...]}` note object. |
 | `json-generic` | Any JSON with a `turns` or `utterances` array | Configurable field mapping. |
 | `plaintext` | Plain `.txt` file with speaker-prefixed lines | Final fallback; sniffs for `Speaker: text` lines. |
 
@@ -72,7 +73,7 @@ like this:
    wins. The priority order is:
 
    ```
-   VTT → SRT → Gong → Fireflies → Otter → Recall → Grain → JSONGeneric → Plaintext
+   VTT → SRT → Gong → Fireflies → Otter → Recall → Grain → Granola → JSONGeneric → Plaintext
    ```
 
    Most-specific recorders are tried first; the generic JSON adapter and the

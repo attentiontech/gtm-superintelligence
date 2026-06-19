@@ -13,6 +13,7 @@ from ..models import Transcript
 from .fireflies import FirefliesAdapter
 from .gong import GongAdapter
 from .grain import GrainAdapter
+from .granola import GranolaAdapter
 from .json_generic import JSONGenericAdapter
 from .otter import OtterAdapter
 from .plaintext import PlaintextAdapter
@@ -31,6 +32,7 @@ ADAPTERS = [
     OtterAdapter(),
     RecallAdapter(),
     GrainAdapter(),
+    GranolaAdapter(),
     JSONGenericAdapter(),
     PlaintextAdapter(),
 ]

@@ -248,6 +248,54 @@ def test_otter_real_shape(tmp_path):
     assert t.turns[0].start_seconds == 4.5   # 4500 ms -> 4.5 s
 
 
+def test_granola_audio_source_sides(tmp_path):
+    # Real public-API shape (GET /v1/notes/{id}?include=transcript): the audio source
+    # is nested under `speaker` (microphone == rep, speaker == the other side), and
+    # timestamps are absolute ISO `start_time`/`end_time` rebased to call offsets.
+    doc = [
+        {"text": "Walk me through how you do this today.",
+         "start_time": "2026-05-28T23:04:04.000Z", "end_time": "2026-05-28T23:04:10.000Z",
+         "speaker": {"source": "microphone"}},
+        {"text": "It's mostly spreadsheets.",
+         "start_time": "2026-05-28T23:04:15.500Z", "end_time": "2026-05-28T23:04:19.000Z",
+         "speaker": {"source": "speaker"}},
+    ]
+    p = tmp_path / "call.granola.json"
+    p.write_text(json.dumps(doc))
+    t = load_transcript(str(p))
+    assert t.source["recorder"] == "granola"
+    assert t.turns[0].side == "rep"          # microphone -> rep
+    assert t.turns[0].speaker == "You"       # unnamed mic channel
+    assert t.turns[0].start_seconds == 0.0   # rebased to first segment
+    assert t.turns[1].side == "prospect"     # speaker (other side) -> prospect
+    assert t.turns[1].speaker == "Participant"
+    assert t.turns[1].start_seconds == 11.5  # 23:04:15.5 - 23:04:04
+    assert t.started_at == "2026-05-28T23:04:04+00:00"
+
+
+def test_granola_wrapped_note_and_legacy_source(tmp_path):
+    # Accept the full note object {"transcript": [...]} and the legacy top-level
+    # `source: system` desktop shape with `start_timestamp`.
+    doc = {"transcript": [
+        {"source": "system", "text": "Legacy other-side line.",
+         "start_timestamp": "2026-05-28T23:04:04.000Z"},
+    ]}
+    p = tmp_path / "note.json"
+    p.write_text(json.dumps(doc))
+    t = load_transcript(str(p))
+    assert t.source["recorder"] == "granola"
+    assert t.turns[0].side == "prospect"
+
+
+def test_granola_does_not_steal_generic_json(tmp_path):
+    # A generic {"turns": [...]} export has no microphone/system source -> json-generic.
+    doc = {"turns": [{"speaker": "Rep", "text": "Hi", "side": "rep"}]}
+    p = tmp_path / "generic.json"
+    p.write_text(json.dumps(doc))
+    t = load_transcript(str(p))
+    assert t.source["recorder"] != "granola"
+
+
 def test_force_adapter(tmp_path):
     p = tmp_path / "ambiguous.txt"
     p.write_text(PLAINTEXT)

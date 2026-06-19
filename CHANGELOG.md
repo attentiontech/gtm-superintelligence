@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and this project adheres to
 semantic versioning.
 
+## [Unreleased]
+
+### Added
+- `granola` adapter for Granola public-API transcripts (`GET /v1/notes/{id}?include=transcript`).
+  Splits turns by audio source (`microphone`→rep, `speaker`/`system`→prospect) instead of
+  diarized names, rebases absolute ISO timestamps to call offsets, and accepts the bare array
+  or wrapped `{"transcript": [...]}` note object. 10 adapters total.
+
 ## [0.1.0] - 2026-05-31
 
 ### Added
